@@ -1,0 +1,21 @@
+paths:
+  data_dir: data/sample_docs
+  persist_dir: storage/chroma
+
+chroma:
+  collection: ragopslab
+
+models:
+  embedding_model: nomic-embed-text
+
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 200
+
+files:
+  extensions: [txt, md, pdf]
+
+list:
+  limit: 5
+  format: table
+  preview_width: 80
