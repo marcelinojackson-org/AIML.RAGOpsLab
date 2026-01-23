@@ -27,10 +27,11 @@ AIML.RAGOpsLab
 - uv
 - Ollama running locally
 
-## Current status
+## Architecture (current)
 
-- Foundation in place (package + CLI stubs).
-- Next milestone: ingestion pipeline.
+- **Ingest**: file loaders (txt/md/pdf) → chunking → embeddings (Ollama) → Chroma
+- **Inspect**: list stored chunks and metadata in table/CSV/TSV formats
+- **Config**: `config.yaml` provides defaults; CLI flags override per run
 
 ## Chroma data behavior
 
@@ -45,6 +46,7 @@ AIML.RAGOpsLab
 ## Inspecting Chroma data
 
 - Use `python -m ragopslab list --limit 0` to return **all rows** in the collection.
+- Use `--format csv|tsv` for scrollable output, and `--output <file>` to save to disk.
 
 ## Configuration
 

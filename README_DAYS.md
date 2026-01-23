@@ -40,8 +40,9 @@ python -m ragopslab chat
 - Local embeddings via `OllamaEmbeddings`.
 - Chroma persistence in a local directory (`storage/chroma`).
 - CLI options for chunk sizing, extensions, and reset.
-- A `list` command to inspect Chroma contents (count + sample rows).
+- A `list` command to inspect Chroma contents (table/CSV/TSV).
 - A `config.yaml` file that is auto-loaded; CLI flags override config values.
+- Output-to-file support for CSV/TSV lists.
 
 **End-of-day demo**
 ```bash
@@ -114,7 +115,7 @@ python -m ragopslab list \
 - I implemented the ingestion pipeline that discovers files (including PDFs), chunks them, and embeds locally with Ollama.
 - Vectors are persisted in a local Chroma store so the chat step can reuse the index.
 - The CLI now supports chunk sizing, file extensions, reset for clean re-indexing, a list command to inspect stored docs, and duplicate skipping (files already indexed are not reloaded).
-- The list output is now a compact table, with an option to print full metadata when needed.
+- The list output supports table/CSV/TSV, optional full metadata, `--limit 0` for all rows, and file output via `--output`.
 - PDF parsing warnings from `pypdf` are suppressed to keep ingest output clean.
 - Next, I will add the chat retrieval path and citations.
 
