@@ -5,6 +5,7 @@ import sys
 import textwrap
 from pathlib import Path
 
+from ragopslab.chat import answer_question
 from ragopslab.config import load_config
 from ragopslab.ingest import ingest_directory
 from ragopslab.inspect import summarize_collection
@@ -42,8 +43,66 @@ def _cmd_ingest(args: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_chat(_args: argparse.Namespace) -> int:
-    print("chat: not implemented yet")
+def _cmd_chat(args: argparse.Namespace) -> int:
+    config = load_config(Path(args.config) if args.config else None)
+    query = args.query or ""
+    if not query:
+        print("Error: --query is required.")
+        return 1
+
+    chat_model = args.chat_model or config["models"]["chat_model"]
+    embedding_model = args.embedding_model or config["models"]["embedding_model"]
+    k = args.k if args.k is not None else config["retrieval"]["k"]
+
+    result = answer_question(
+        query=query,
+        persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
+        collection_name=args.collection or config["chroma"]["collection"],
+        embedding_model=embedding_model,
+        chat_model=chat_model,
+        k=k,
+    )
+
+    if args.output_format == "markdown":
+        print("Answer:")
+        print(result.answer)
+        print("\nCitations:")
+        if not result.citations:
+            print("1. None")
+            return 0
+        for item in result.citations:
+            file_name = item.get("file_name", "") or "unknown"
+            page = item.get("page", "")
+            source = item.get("source", "")
+            page_part = f" (page {page})" if page != "" else ""
+            print(f"{item['index']}. {file_name}{page_part} — {source}")
+        return 0
+
+    if args.output_format == "json":
+        print(
+            json.dumps(
+                {
+                    "question": query,
+                    "answer": result.answer,
+                    "citations": result.citations,
+                },
+                ensure_ascii=True,
+                indent=2,
+            )
+        )
+        return 0
+
+    print("Answer:")
+    print(result.answer)
+    print("\nCitations:")
+    if not result.citations:
+        print("1) None")
+        return 0
+    for item in result.citations:
+        print(
+            f"{item['index']}) file={item.get('file_name','')} | "
+            f"page={item.get('page','')} | source={item.get('source','')}"
+        )
     return 0
 
 
@@ -95,6 +154,8 @@ def _cmd_list(args: argparse.Namespace) -> int:
             persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
             collection_name=args.collection or config["chroma"]["collection"],
             limit=limit,
+            include_embeddings=args.include_vectors,
+            page=args.page,
         )
     except FileNotFoundError as exc:
         print(f"Error: {exc}")
@@ -105,6 +166,8 @@ def _cmd_list(args: argparse.Namespace) -> int:
             headers = ["#", "id", "file", "page", "ext", "preview"]
             if args.full_meta:
                 headers.append("metadata")
+            if args.include_vectors:
+                headers.append("vector")
             delimiter = "," if fmt == "csv" else "\t"
             if args.output:
                 _write_delimited(Path(args.output), headers=headers, rows=[], delimiter=delimiter)
@@ -119,11 +182,15 @@ def _cmd_list(args: argparse.Namespace) -> int:
     for idx, doc_id in enumerate(summary.ids, start=1):
         metadata = summary.metadatas[idx - 1] if idx - 1 < len(summary.metadatas) else {}
         document = summary.documents[idx - 1] if idx - 1 < len(summary.documents) else ""
-        preview = textwrap.shorten(
-            document.replace("\n", " "),
-            width=preview_width,
-            placeholder="…",
-        )
+        content = document.replace("\n", " ")
+        if args.chunk_text:
+            preview = content
+        else:
+            preview = textwrap.shorten(
+                content,
+                width=preview_width,
+                placeholder="…",
+            )
 
         source = metadata.get("source", "")
         file_name = metadata.get("file_name") or Path(source).name if source else ""
@@ -133,11 +200,20 @@ def _cmd_list(args: argparse.Namespace) -> int:
         row = [str(idx), doc_id, file_name, page, ext, preview]
         if args.full_meta:
             row.append(json.dumps(metadata, ensure_ascii=True))
+        if args.include_vectors:
+            vector = summary.embeddings[idx - 1] if summary.embeddings else None
+            if vector is not None and hasattr(vector, "tolist"):
+                vector = vector.tolist()
+            if vector is not None and args.vector_dims:
+                vector = vector[: args.vector_dims]
+            row.append(json.dumps(vector, ensure_ascii=True))
         rows.append(row)
 
     headers = ["#", "id", "file", "page", "ext", "preview"]
     if args.full_meta:
         headers.append("metadata")
+    if args.include_vectors:
+        headers.append("vector")
 
     if fmt == "table":
         if args.output:
@@ -183,6 +259,14 @@ def main() -> int:
     ingest.set_defaults(func=_cmd_ingest)
 
     chat = subparsers.add_parser("chat", help="Chat over the indexed data")
+    chat.add_argument("--config", default="config.yaml")
+    chat.add_argument("--query")
+    chat.add_argument("--persist-dir")
+    chat.add_argument("--collection")
+    chat.add_argument("--embedding-model")
+    chat.add_argument("--chat-model")
+    chat.add_argument("--k", type=int)
+    chat.add_argument("--output-format", choices=["markdown", "json", "plain"], default="markdown")
     chat.set_defaults(func=_cmd_chat)
 
     list_cmd = subparsers.add_parser("list", help="List documents in Chroma")
@@ -193,6 +277,10 @@ def main() -> int:
     list_cmd.add_argument("--full-meta", action="store_true")
     list_cmd.add_argument("--format", choices=["table", "csv", "tsv"])
     list_cmd.add_argument("--preview-width", type=int)
+    list_cmd.add_argument("--chunk-text", action="store_true", help="Show full chunk text.")
+    list_cmd.add_argument("--include-vectors", action="store_true", help="Include embedding vectors.")
+    list_cmd.add_argument("--page", type=int, help="Filter results to a PDF page number.")
+    list_cmd.add_argument("--vector-dims", type=int, help="Limit vector dimensions in output.")
     list_cmd.add_argument("--output", help="Write CSV/TSV output to a file (relative paths allowed).")
     list_cmd.set_defaults(func=_cmd_list)
 

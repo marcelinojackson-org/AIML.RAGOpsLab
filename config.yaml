@@ -7,6 +7,7 @@ chroma:
 
 models:
   embedding_model: nomic-embed-text
+  chat_model: llama3.1:8b
 
 chunking:
   chunk_size: 1000
@@ -19,3 +20,6 @@ list:
   limit: 5
   format: table
   preview_width: 80
+
+retrieval:
+  k: 4

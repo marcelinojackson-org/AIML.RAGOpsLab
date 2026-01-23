@@ -17,6 +17,7 @@ DEFAULTS: dict[str, Any] = {
     },
     "models": {
         "embedding_model": "nomic-embed-text",
+        "chat_model": "llama3.1:8b",
     },
     "chunking": {
         "chunk_size": 1000,
@@ -29,6 +30,9 @@ DEFAULTS: dict[str, Any] = {
         "limit": 5,
         "format": "table",
         "preview_width": 80,
+    },
+    "retrieval": {
+        "k": 4,
     },
 }
 
@@ -55,4 +59,3 @@ def load_config(path: Path | None) -> dict[str, Any]:
         raise ValueError("config.yaml must be a mapping at the top level.")
 
     return _deep_merge(DEFAULTS, data)
-
