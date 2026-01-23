@@ -18,7 +18,6 @@ AIML.RAGOpsLab
 ├─ storage/            # Local vector store persistence
 ├─ requirements.txt    # Dependencies (managed via uv)
 ├─ README.md           # Repo overview (this file)
-├─ README_DAYS.md      # Day-by-day plan + demos
 ```
 
 ## Requirements
@@ -33,6 +32,163 @@ AIML.RAGOpsLab
 - **Chat**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
 - **Inspect**: list stored chunks and metadata in table/CSV/TSV formats
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
+
+## Setup
+
+```bash
+cd /Users/marc/dev/opensource/AIML/AIML.RAGOpsLab
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+# Ensure Ollama is running and models are available
+ollama pull nomic-embed-text
+ollama pull llama3.1:8b
+```
+
+## Quickstart
+
+```bash
+# Ingest documents (reset for a clean index)
+python -m ragopslab ingest --reset
+
+# Ask a question
+python -m ragopslab chat --query "Summarize the resume in 3 bullet points."
+```
+
+## Configuration
+
+- `config.yaml` is auto-loaded by default.
+- CLI flags override values from `config.yaml`.
+
+Default config sections:
+- `paths`: `data_dir`, `persist_dir`
+- `chroma`: `collection`
+- `models`: `embedding_model`, `chat_model`
+- `chunking`: `chunk_size`, `chunk_overlap`
+- `files`: `extensions`
+- `list`: `limit`, `format`, `preview_width`
+- `retrieval`: `k`
+
+## CLI commands
+
+### `ingest`
+
+Index files into Chroma.
+
+```bash
+python -m ragopslab ingest --reset
+```
+
+Options:
+- `--config`: path to config file (default: `config.yaml`)
+- `--data-dir`: directory to ingest (default from config)
+- `--persist-dir`: Chroma storage directory (default from config)
+- `--collection`: Chroma collection name (default from config)
+- `--embedding-model`: Ollama embedding model (default from config)
+- `--chunk-size`: chunk size (default from config)
+- `--chunk-overlap`: chunk overlap (default from config)
+- `--extensions`: comma-separated list (or config list)
+- `--reset`: delete existing Chroma data before re-indexing
+
+Behavior:
+- Duplicate files (by `source` path) are skipped and reported as `Duplicate: <path>`.
+
+Examples:
+```bash
+# Ingest a specific directory
+python -m ragopslab ingest \
+  --data-dir data/sample_docs \
+  --persist-dir storage/chroma \
+  --collection ragopslab \
+  --embedding-model nomic-embed-text
+
+# Full re-index
+python -m ragopslab ingest --reset
+```
+
+### `list`
+
+Inspect stored chunks and metadata.
+
+```bash
+python -m ragopslab list --limit 5
+```
+
+Options:
+- `--config`: path to config file (default: `config.yaml`)
+- `--persist-dir`: Chroma storage directory (default from config)
+- `--collection`: Chroma collection name (default from config)
+- `--limit`: number of rows (use `0` for all rows)
+- `--format`: `table|csv|tsv` (default from config)
+- `--preview-width`: preview width (default from config)
+- `--full-meta`: include full metadata column
+- `--page`: filter to a PDF page number
+- `--chunk-text`: show full chunk text (not preview)
+- `--include-vectors`: include embedding vectors
+- `--vector-dims`: limit vector dimensions in output
+- `--output`: write CSV/TSV to a file (relative paths allowed)
+
+Notes:
+- For large output (full chunks or vectors), use CSV/TSV + `--output`.
+- `--output` is only supported for CSV/TSV.
+
+Examples:
+```bash
+# CSV output
+python -m ragopslab list --format csv --limit 5
+
+# All rows to CSV file
+python -m ragopslab list --limit 0 --format csv --output temp/chroma_list.csv
+
+# Filter to a page and include vectors (large output)
+python -m ragopslab list \
+  --page 0 \
+  --chunk-text \
+  --include-vectors \
+  --vector-dims 10 \
+  --format csv \
+  --output temp/page0_chunks_vectors_10dims.csv
+```
+
+Sample output (captured):
+```bash
+python -m ragopslab list --limit 3 --format csv
+#,id,file,page,ext,preview
+1,837d56f0-6e58-40db-b489-4fd0407d044e,Marcelino Jackson - Senior DevSecOps-GenAI-LLMOps Architect.pdf,0,pdf,Marcelino Jackson Senior DevSecOps Architect & GenAI/LLMOps Engineer 📧…
+2,038252db-798b-4263-86b2-3408181905cf,Marcelino Jackson - Senior DevSecOps-GenAI-LLMOps Architect.pdf,0,pdf,US Citizen with Secret ‘Q’ Dept-of-Energy(DOE) Clearance Work Accomplishment…
+3,d2da6332-8a7d-44ae-932c-e1b1c4bbac46,Marcelino Jackson - Senior DevSecOps-GenAI-LLMOps Architect.pdf,0,pdf,·Enforced strict RBAC and dynamic AISQL governance within an existing SnowVlake…
+```
+
+### `chat`
+
+Ask questions against indexed data (basic RAG loop).
+
+```bash
+python -m ragopslab chat --query "Summarize the resume in 3 bullet points."
+```
+
+Options:
+- `--config`: path to config file (default: `config.yaml`)
+- `--query`: question to ask (required)
+- `--persist-dir`: Chroma storage directory (default from config)
+- `--collection`: Chroma collection name (default from config)
+- `--embedding-model`: embedding model for retrieval (default from config)
+- `--chat-model`: Ollama chat model (default from config)
+- `--k`: number of chunks retrieved (default from config)
+- `--output-format`: `markdown|json|plain` (default: `markdown`)
+
+Output:
+- Answer + citations (file, page, source)
+
+Examples:
+```bash
+# Default markdown output
+python -m ragopslab chat --query "Summarize the resume in 3 bullet points."
+
+# JSON output for scripting
+python -m ragopslab chat --query "Summarize the resume in 3 bullet points." --output-format json
+```
 
 ## Chroma data behavior
 
@@ -49,12 +205,3 @@ AIML.RAGOpsLab
 - Use `python -m ragopslab list --limit 0` to return **all rows** in the collection.
 - Use `--format csv|tsv` for scrollable output, and `--output <file>` to save to disk.
 - Use `--page <n>` to filter by PDF page, `--chunk-text` for full chunk text, and `--include-vectors` (optionally `--vector-dims N`) to export embeddings.
-
-## Configuration
-
-- `config.yaml` is auto-loaded by default.
-- CLI flags override values from `config.yaml`.
-
-## See the day-by-day plan
-
-For daily goals, demos, and standup-friendly status notes, see `README_DAYS.md`.
