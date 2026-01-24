@@ -1,4 +1,4 @@
-# AIML.RAGOpsLab (LangChain)
+# AIML.RAGOpsLab (LangChain) — Work in Progress
 
 A clean, incremental build of a local RAG system using LangChain + Ollama + Chroma.
 
@@ -26,12 +26,14 @@ AIML.RAGOpsLab
 - uv
 - Ollama running locally
 
-## Architecture (current)
+## Architecture
 
 - **Ingest**: file loaders (txt/md/pdf) → chunking → embeddings (Ollama) → Chroma
 - **Chat**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
 - **Inspect**: list stored chunks and metadata in table/CSV/TSV formats
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
+
+![Architecture Cross-Functional Diagram](docs/architecture_cross.svg)
 
 ## Setup
 
@@ -60,6 +62,35 @@ python -m ragopslab chat --query "Summarize the resume in 3 bullet points."
 
 - `config.yaml` is auto-loaded by default.
 - CLI flags override values from `config.yaml`.
+
+Default `config.yaml`:
+```yaml
+paths:
+  data_dir: data/sample_docs
+  persist_dir: storage/chroma
+
+chroma:
+  collection: ragopslab
+
+models:
+  embedding_model: nomic-embed-text
+  chat_model: llama3.1:8b
+
+chunking:
+  chunk_size: 1000
+  chunk_overlap: 200
+
+files:
+  extensions: [txt, md, pdf]
+
+list:
+  limit: 5
+  format: table
+  preview_width: 80
+
+retrieval:
+  k: 4
+```
 
 Default config sections:
 - `paths`: `data_dir`, `persist_dir`

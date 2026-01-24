@@ -1,0 +1,50 @@
+flowchart LR
+  subgraph User
+    UQ[Ask Question]
+    UD[Provide Documents]
+  end
+
+  subgraph CLI
+    ING[ragopslab ingest]
+    LST[ragopslab list]
+    CHT[ragopslab chat]
+  end
+
+  subgraph Pipeline
+    LOAD[Loaders<br/>txt/md/pdf]
+    CHK[Chunking<br/>size/overlap]
+    RET[Retriever<br/>top-k]
+  end
+
+  subgraph "Vector Store (Chroma)"
+    VEC[(Chroma DB)]
+  end
+
+  subgraph "Models (Ollama)"
+    EMB[Embeddings<br/>nomic-embed-text]
+    LLM[Chat LLM<br/>llama3.1:8b]
+  end
+
+  subgraph Config
+    CFG[config.yaml]
+  end
+
+  UD --> ING
+  ING --> LOAD --> CHK --> EMB --> VEC
+
+  UQ --> CHT
+  CHT --> RET --> VEC
+  RET --> LLM
+  LLM --> CHT
+
+  UQ --> LST
+  LST --> VEC
+
+  CFG -.-> ING
+  CFG -.-> CHT
+  CFG -.-> LST
+  CFG -.-> LOAD
+  CFG -.-> CHK
+  CFG -.-> RET
+  CFG -.-> EMB
+  CFG -.-> LLM
