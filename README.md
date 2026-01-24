@@ -44,7 +44,7 @@ AIML.RAGOpsLab
 ## Setup
 
 ```bash
-cd /Users/marc/dev/opensource/AIML/AIML.RAGOpsLab
+cd AIML.RAGOpsLab
 uv venv
 source .venv/bin/activate
 uv pip install -r requirements.txt
