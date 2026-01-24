@@ -35,6 +35,12 @@ AIML.RAGOpsLab
 
 ![Architecture Cross-Functional Diagram](docs/architecture_cross.svg)
 
+## Yet to come (Work in Progress)
+
+- **LangGraph orchestration** — adaptive retrieval and retries.
+- **More data formats + metadata** — CSV/JSON/SQL loaders and targeted filters.
+- **Advanced LangChain tooling** — evals, tracing, optional serving.
+
 ## Setup
 
 ```bash
