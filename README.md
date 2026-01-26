@@ -28,17 +28,22 @@ AIML.RAGOpsLab
 
 ## Architecture
 
-- **Ingest**: file loaders (txt/md/pdf) → chunking → embeddings (Ollama) → Chroma
+- **Ingest**: file loaders (txt/md/pdf/csv/json) → chunking → embeddings (Ollama) → Chroma
 - **Chat (basic)**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
 - **Chat (LangGraph)**: adaptive retrieval with retries + usage/cost tracking
-- **Inspect**: list stored chunks and metadata in table/CSV/TSV formats
+- **Inspect**: list stored chunks/metadata and source inventories (table/CSV/TSV)
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
 
-![Architecture Cross-Functional Diagram](docs/architecture_cross.svg)
+### Flowchart
+
+![Flowchart](docs/architecture_flow.svg)
+
+### Cross Functional Flowchart
+
+![Cross Functional Flowchart](docs/architecture_cross.svg)
 
 ## Yet to come (Work in Progress)
 
-- **More data formats + metadata** — CSV/JSON/SQL loaders and targeted filters.
 - **Advanced LangChain tooling** — evals, tracing, optional serving.
 
 ## Setup
@@ -87,7 +92,7 @@ chunking:
   chunk_overlap: 200
 
 files:
-  extensions: [txt, md, pdf]
+  extensions: [txt, md, pdf, csv, json]
 
 list:
   limit: 5
@@ -111,8 +116,8 @@ cost:
 
 pricing:
   llama3.1:8b:
-    prompt_per_1k: 0.0
-    completion_per_1k: 0.0
+    prompt_per_1k: 10.0
+    completion_per_1k: 20.0
 ```
 
 Default config sections:
@@ -149,6 +154,7 @@ Options:
 
 Behavior:
 - Duplicate files (by `source` path) are skipped and reported as `Duplicate: <path>`.
+- CSV rows and JSON records are stored as individual documents with `row_id` or `record_id`.
 
 Examples:
 ```bash
@@ -216,6 +222,35 @@ python -m ragopslab list --limit 3 --format csv
 3,d2da6332-8a7d-44ae-932c-e1b1c4bbac46,Marcelino Jackson - Senior DevSecOps-GenAI-LLMOps Architect.pdf,0,pdf,·Enforced strict RBAC and dynamic AISQL governance within an existing SnowVlake…
 ```
 
+### `sources`
+
+List unique sources and counts (what files were indexed).
+
+```bash
+python -m ragopslab sources
+```
+
+Options:
+- `--config`: path to config file (default: `config.yaml`)
+- `--persist-dir`: Chroma storage directory (default from config)
+- `--collection`: Chroma collection name (default from config)
+- `--format`: `table|csv|tsv` (default: `table`)
+- `--output`: write CSV/TSV to a file
+- `--source-type`: filter by `source_type` (csv/json/pdf/txt/md)
+- `--file-name`: filter by file name
+
+Examples:
+```bash
+# Table output
+python -m ragopslab sources
+
+# Filter to CSV sources
+python -m ragopslab sources --source-type csv
+
+# Export to CSV
+python -m ragopslab sources --format csv --output temp/sources.csv
+```
+
 ### `chat`
 
 Ask questions against indexed data (basic RAG loop).
@@ -279,3 +314,4 @@ python -m ragopslab chat \
 - Use `python -m ragopslab list --limit 0` to return **all rows** in the collection.
 - Use `--format csv|tsv` for scrollable output, and `--output <file>` to save to disk.
 - Use `--page <n>` to filter by PDF page, `--chunk-text` for full chunk text, and `--include-vectors` (optionally `--vector-dims N`) to export embeddings.
+- Use `python -m ragopslab sources` to see which files were indexed and how many chunks/records each produced.

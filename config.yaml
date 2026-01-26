@@ -14,7 +14,7 @@ chunking:
   chunk_overlap: 200
 
 files:
-  extensions: [txt, md, pdf]
+  extensions: [txt, md, pdf, csv, json]
 
 list:
   limit: 5
@@ -38,5 +38,5 @@ cost:
 
 pricing:
   llama3.1:8b:
-    prompt_per_1k: 0.0
-    completion_per_1k: 0.0
+    prompt_per_1k: 10.0
+    completion_per_1k: 20.0

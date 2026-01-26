@@ -5,8 +5,11 @@ import logging
 from pathlib import Path
 import shutil
 from typing import Iterable, Set
+import csv
+import json
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
+from langchain_core.documents import Document
 from langchain_chroma import Chroma
 from langchain_ollama import OllamaEmbeddings
 import chromadb
@@ -16,6 +19,8 @@ SUPPORTED_EXTENSIONS = {
     ".txt": "text",
     ".md": "text",
     ".pdf": "pdf",
+    ".csv": "csv",
+    ".json": "json",
 }
 
 # Silence noisy PDF parsing warnings from pypdf (e.g., xref offset issues).
@@ -45,18 +50,70 @@ def _gather_files(data_dir: Path, extensions: Iterable[str]) -> list[Path]:
 
 def _load_file(path: Path) -> list:
     suffix = path.suffix.lower()
+    source_type = suffix.lstrip(".")
     if suffix in {".txt", ".md"}:
         loader = TextLoader(str(path), autodetect_encoding=True)
+        docs = loader.load()
     elif suffix == ".pdf":
         loader = PyPDFLoader(str(path))
+        docs = loader.load()
+    elif suffix == ".csv":
+        docs = []
+        with path.open(newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            for idx, row in enumerate(reader, start=1):
+                content = "\n".join(f"{k}: {v}" for k, v in row.items())
+                docs.append(
+                    Document(
+                        page_content=content,
+                        metadata={
+                            "source": str(path),
+                            "file_name": path.name,
+                            "file_ext": source_type,
+                            "source_type": source_type,
+                            "row_id": idx,
+                        },
+                    )
+                )
+    elif suffix == ".json":
+        docs = []
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(data, list):
+            for idx, item in enumerate(data, start=1):
+                content = json.dumps(item, ensure_ascii=True)
+                docs.append(
+                    Document(
+                        page_content=content,
+                        metadata={
+                            "source": str(path),
+                            "file_name": path.name,
+                            "file_ext": source_type,
+                            "source_type": source_type,
+                            "record_id": idx,
+                        },
+                    )
+                )
+        else:
+            content = json.dumps(data, ensure_ascii=True)
+            docs.append(
+                Document(
+                    page_content=content,
+                    metadata={
+                        "source": str(path),
+                        "file_name": path.name,
+                        "file_ext": source_type,
+                        "source_type": source_type,
+                        "record_id": 1,
+                    },
+                )
+            )
     else:
         return []
-
-    docs = loader.load()
     for doc in docs:
         doc.metadata.setdefault("source", str(path))
         doc.metadata.setdefault("file_name", path.name)
         doc.metadata.setdefault("file_ext", suffix.lstrip("."))
+        doc.metadata.setdefault("source_type", source_type)
     return docs
 
 

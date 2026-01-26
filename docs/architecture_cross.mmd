@@ -1,55 +1,86 @@
-flowchart LR
-  subgraph User
-    UQ[Ask Question]
+%%{init: {"flowchart": {"curve": "linear", "nodeSpacing": 60, "rankSpacing": 45}}}%%
+flowchart TB
+  classDef laneLabel fill:#fde68a,stroke:#f59e0b,color:#111827,stroke-width:1px,rx:4,ry:4
+  classDef laneBox fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+
+  subgraph LaneUser[" "]
+    direction LR
+    ULBL["User"]:::laneLabel
     UD[Provide Documents]
+    UQ[Ask / Inspect]
+    ULBL --> UD
+    ULBL --> UQ
   end
 
-  subgraph CLI
+  subgraph LaneCLI[" "]
+    direction LR
+    CLBL["CLI"]:::laneLabel
     ING[ragopslab ingest]
-    LST[ragopslab list]
     CHT[ragopslab chat]
+    LST[ragopslab list]
+    SRC[ragopslab sources]
+    CLBL --> ING
+    CLBL --> CHT
+    CLBL --> LST
+    CLBL --> SRC
   end
 
-  subgraph Pipeline
-    LOAD[Loaders<br/>txt/md/pdf]
+  subgraph LanePipeline[" "]
+    direction LR
+    PLBL["Pipeline"]:::laneLabel
+    LOAD[Loaders<br/>txt/md/pdf/csv/json]
     CHK[Chunking<br/>size/overlap]
     LG["LangGraph (optional)"]
     RET[Retriever<br/>top-k]
+    PLBL --> LOAD
   end
 
-  subgraph "Vector Store (Chroma)"
-    VEC[(Chroma DB)]
-  end
-
-  subgraph "Models (Ollama)"
+  subgraph LaneModels[" "]
+    direction LR
+    MLB["Models (Ollama)"]:::laneLabel
     EMB[Embeddings<br/>nomic-embed-text]
     LLM[Chat LLM<br/>llama3.1:8b]
+    ANS[Answer + citations]
+    MLB --> EMB
   end
 
-  subgraph Config
+  subgraph LaneVector[" "]
+    direction LR
+    VLBL["Vector Store (Chroma)"]:::laneLabel
+    VEC[(Chroma DB)]
+    VLBL --> VEC
+  end
+
+  subgraph LaneConfig[" "]
+    direction LR
+    CGLB["Config"]:::laneLabel
     CFG[config.yaml]
+    CGLB --> CFG
   end
 
-  UD --> ING
-  ING --> LOAD --> CHK --> EMB --> VEC
+  %% Primary flows (left-to-right across lanes)
+  UD --> ING --> LOAD --> CHK --> EMB --> VEC
+  UQ --> CHT --> LG --> RET --> VEC
+  RET --> LLM --> ANS
+  UQ --> LST --> VEC
+  UQ --> SRC --> VEC
 
-  UQ --> CHT
-  CHT --> LG
-  CHT -.-> RET
-  LG --> RET
-  RET --> VEC
-  RET --> LLM
-  LLM --> CHT
-
-  UQ --> LST
-  LST --> VEC
-
+  %% Config influences (dotted)
   CFG -.-> ING
   CFG -.-> CHT
   CFG -.-> LST
+  CFG -.-> SRC
   CFG -.-> LOAD
   CFG -.-> CHK
   CFG -.-> LG
   CFG -.-> RET
   CFG -.-> EMB
   CFG -.-> LLM
+
+  %% Lane styling (swimlane feel)
+  style LaneUser fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+  style LaneCLI fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+  style LanePipeline fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+  style LaneModels fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+  style LaneVector fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0
+  style LaneConfig fill:transparent,stroke:#e5e7eb,stroke-width:1px,rx:0,ry:0

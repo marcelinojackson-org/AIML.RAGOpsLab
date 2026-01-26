@@ -1,0 +1,12 @@
+[
+  {
+    "skill": "Python",
+    "years": 7,
+    "notes": "Data pipelines, automation, and LLM integrations"
+  },
+  {
+    "skill": "Terraform",
+    "years": 6,
+    "notes": "IaC for cloud environments"
+  }
+]

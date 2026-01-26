@@ -24,7 +24,7 @@ DEFAULTS: dict[str, Any] = {
         "chunk_overlap": 200,
     },
     "files": {
-        "extensions": ["txt", "md", "pdf"],
+        "extensions": ["txt", "md", "pdf", "csv", "json"],
     },
     "list": {
         "limit": 5,

@@ -237,13 +237,32 @@ python -m ragopslab chat \
 - Config now supports retrieval bounds and per‑model pricing, with CLI flags to enable graph mode and usage output.
 - Chat output now prints the answer in a fenced block for readability.
 
-## Day 5 - More data formats + config
+## Day 5 - More data formats + config (done)
 
 **Goal**
 - Add loaders for more formats and a config-driven pipeline.
 
-**Planned demo**
-- Ingest a mixed-format directory and show it in chat.
+**What was built**
+- CSV + JSON sample files in `data/sample_docs`.
+- CSV loader (row → document) and JSON loader (record → document).
+- Metadata normalization: `source_type`, `row_id`, `record_id`.
+- New `sources` CLI command to list indexed sources with counts.
+
+**End-of-day demo**
+```bash
+python -m ragopslab ingest --reset
+
+python -m ragopslab sources
+
+python -m ragopslab sources --source-type csv
+
+python -m ragopslab sources --format csv --output temp/sources.csv
+```
+
+**Standup notes (readable status)**
+- Added CSV/JSON loaders with per-record metadata to expand beyond PDFs.
+- Added a `sources` command to list indexed files and counts (table/CSV/TSV).
+- Sample CSV/JSON files are included for demo ingestion.
 
 ## Day 6 - Advanced LangChain tooling
 

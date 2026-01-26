@@ -9,7 +9,7 @@ from ragopslab.chat import answer_question
 from ragopslab.config import load_config
 from ragopslab.graph_chat import answer_question_graph
 from ragopslab.ingest import ingest_directory
-from ragopslab.inspect import summarize_collection
+from ragopslab.inspect import list_sources, summarize_collection
 from ragopslab.usage import build_usage_summary
 
 
@@ -310,6 +310,38 @@ def _cmd_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_sources(args: argparse.Namespace) -> int:
+    config = load_config(Path(args.config) if args.config else None)
+    try:
+        sources = list_sources(
+            persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
+            collection_name=args.collection or config["chroma"]["collection"],
+            source_type=args.source_type,
+            file_name=args.file_name,
+        )
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}")
+        return 1
+
+    if args.format in {"csv", "tsv"}:
+        headers = ["source_type", "file_name", "source", "count"]
+        rows = [[s.source_type, s.file_name, s.source, str(s.count)] for s in sources]
+        delimiter = "," if args.format == "csv" else "\t"
+        if args.output:
+            _write_delimited(Path(args.output), headers=headers, rows=rows, delimiter=delimiter)
+        else:
+            _render_delimited(headers=headers, rows=rows, delimiter=delimiter)
+        return 0
+
+    if not sources:
+        print("No sources found.")
+        return 0
+
+    rows = [[s.source_type, s.file_name, s.source, str(s.count)] for s in sources]
+    _render_table(headers=["type", "file", "source", "count"], rows=rows)
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="RAG Ops Lab (LangChain)")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -323,7 +355,11 @@ def main() -> int:
     ingest.add_argument("--chunk-size", type=int)
     ingest.add_argument("--chunk-overlap", type=int)
     ingest.add_argument("--extensions")
-    ingest.add_argument("--reset", action="store_true")
+    ingest.add_argument(
+        "--reset",
+        action="store_true",
+        help="Delete the existing Chroma index before re-ingesting (full re-index).",
+    )
     ingest.set_defaults(func=_cmd_ingest)
 
     chat = subparsers.add_parser("chat", help="Chat over the indexed data")
@@ -355,6 +391,16 @@ def main() -> int:
     list_cmd.add_argument("--vector-dims", type=int, help="Limit vector dimensions in output.")
     list_cmd.add_argument("--output", help="Write CSV/TSV output to a file (relative paths allowed).")
     list_cmd.set_defaults(func=_cmd_list)
+
+    sources_cmd = subparsers.add_parser("sources", help="List indexed sources")
+    sources_cmd.add_argument("--config", default="config.yaml")
+    sources_cmd.add_argument("--persist-dir")
+    sources_cmd.add_argument("--collection")
+    sources_cmd.add_argument("--format", choices=["table", "csv", "tsv"], default="table")
+    sources_cmd.add_argument("--output", help="Write CSV/TSV output to a file.")
+    sources_cmd.add_argument("--source-type", help="Filter by source_type (csv/json/pdf/txt/md).")
+    sources_cmd.add_argument("--file-name", help="Filter by file name.")
+    sources_cmd.set_defaults(func=_cmd_sources)
 
     args = parser.parse_args()
     return int(args.func(args))

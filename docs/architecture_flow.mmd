@@ -1,0 +1,23 @@
+%%{init: {"flowchart": {"curve": "basis"}}}%%
+flowchart LR
+  CLI[CLI Commands<br/>ingest / chat / list / sources] --> ING[Ingest]
+  CLI --> CHT[Chat]
+  CLI --> LST[Inspect]
+
+  ING --> SRC[Data Sources<br/>pdf/csv/json/txt/md]
+  ING --> LOAD[Loaders]
+  LOAD --> CHK[Chunking]
+  CHK --> EMB[Embeddings<br/>nomic-embed-text]
+  EMB --> VEC[(Chroma DB)]
+
+  CHT --> RET[Retriever<br/>top-k]
+  RET --> VEC
+  RET --> LLM[Chat LLM<br/>llama3.1:8b]
+  LLM --> ANS[Answer + citations]
+
+  LST --> VEC
+
+  Cfg[(config.yaml)] -.-> CLI
+  Cfg -.-> CHK
+  Cfg -.-> RET
+  Cfg -.-> LLM
