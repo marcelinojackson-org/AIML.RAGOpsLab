@@ -7,8 +7,10 @@ from pathlib import Path
 
 from ragopslab.chat import answer_question
 from ragopslab.config import load_config
+from ragopslab.graph_chat import answer_question_graph
 from ragopslab.ingest import ingest_directory
 from ragopslab.inspect import summarize_collection
+from ragopslab.usage import build_usage_summary
 
 
 def _cmd_ingest(args: argparse.Namespace) -> int:
@@ -53,43 +55,102 @@ def _cmd_chat(args: argparse.Namespace) -> int:
     chat_model = args.chat_model or config["models"]["chat_model"]
     embedding_model = args.embedding_model or config["models"]["embedding_model"]
     k = args.k if args.k is not None else config["retrieval"]["k"]
+    k_default = config["retrieval"].get("k_default", k)
+    k_max = config["retrieval"].get("k_max", k)
+    retry_on_no_answer = config["retrieval"].get("retry_on_no_answer", True)
 
-    result = answer_question(
-        query=query,
-        persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
-        collection_name=args.collection or config["chroma"]["collection"],
-        embedding_model=embedding_model,
-        chat_model=chat_model,
-        k=k,
+    use_graph = bool(args.graph)
+    if use_graph:
+        result = answer_question_graph(
+            query=query,
+            persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
+            collection_name=args.collection or config["chroma"]["collection"],
+            embedding_model=embedding_model,
+            chat_model=chat_model,
+            k_default=k_default,
+            k_max=k_max,
+            retry_on_no_answer=retry_on_no_answer,
+            trace=bool(args.trace),
+            trace_preview_width=args.trace_preview_width,
+        )
+        response_metadata = result.response_metadata
+        context = result.context or ""
+        used_k = result.used_k
+        attempts = result.attempts
+    else:
+        result = answer_question(
+            query=query,
+            persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
+            collection_name=args.collection or config["chroma"]["collection"],
+            embedding_model=embedding_model,
+            chat_model=chat_model,
+            k=k,
+        )
+        response_metadata = result.response_metadata
+        context = result.context or ""
+        used_k = k
+        attempts = 0
+
+    cost_cfg = config.get("cost", {})
+    pricing = config.get("pricing", {})
+    show_usage = bool(args.show_usage or cost_cfg.get("show_usage", False))
+    usage = build_usage_summary(
+        response_metadata=response_metadata,
+        estimator=cost_cfg.get("estimator", "ollama"),
+        prompt_text=context + "\n\nQuestion: " + query,
+        completion_text=result.answer,
+        model=chat_model,
+        pricing=pricing,
+        default_prompt_per_1k=cost_cfg.get("default_prompt_per_1k", 0.0),
+        default_completion_per_1k=cost_cfg.get("default_completion_per_1k", 0.0),
+        enabled=cost_cfg.get("enabled", False),
     )
 
     if args.output_format == "markdown":
-        print("Answer:")
+        print("\nAnswer:")
+        print("```")
         print(result.answer)
+        print("```")
         print("\nCitations:")
         if not result.citations:
             print("1. None")
-            return 0
-        for item in result.citations:
-            file_name = item.get("file_name", "") or "unknown"
-            page = item.get("page", "")
-            source = item.get("source", "")
-            page_part = f" (page {page})" if page != "" else ""
-            print(f"{item['index']}. {file_name}{page_part} — {source}")
+        else:
+            for item in result.citations:
+                file_name = item.get("file_name", "") or "unknown"
+                page = item.get("page", "")
+                source = item.get("source", "")
+                page_part = f" (page {page})" if page != "" else ""
+                print(f"{item['index']}. {file_name}{page_part} — {source}")
+        if use_graph:
+            print(f"\nRetrieval:")
+            print(f"- used_k: {used_k}")
+            print(f"- attempts: {attempts}")
+            print("")
+        if show_usage and usage:
+            print("\nUsage:")
+            print(f"- prompt_tokens: {usage.prompt_tokens}")
+            print(f"- completion_tokens: {usage.completion_tokens}")
+            print(f"- total_tokens: {usage.total_tokens}")
+            if usage.estimated_cost is not None:
+                print(f"- estimated_cost: ${usage.estimated_cost:.4f}")
         return 0
 
     if args.output_format == "json":
-        print(
-            json.dumps(
-                {
-                    "question": query,
-                    "answer": result.answer,
-                    "citations": result.citations,
-                },
-                ensure_ascii=True,
-                indent=2,
-            )
-        )
+        payload = {
+            "question": query,
+            "answer": result.answer,
+            "citations": result.citations,
+        }
+        if use_graph:
+            payload["retrieval"] = {"used_k": used_k, "attempts": attempts}
+        if show_usage and usage:
+            payload["usage"] = {
+                "prompt_tokens": usage.prompt_tokens,
+                "completion_tokens": usage.completion_tokens,
+                "total_tokens": usage.total_tokens,
+                "estimated_cost": usage.estimated_cost,
+            }
+        print(json.dumps(payload, ensure_ascii=True, indent=2))
         return 0
 
     print("Answer:")
@@ -102,6 +163,13 @@ def _cmd_chat(args: argparse.Namespace) -> int:
         print(
             f"{item['index']}) file={item.get('file_name','')} | "
             f"page={item.get('page','')} | source={item.get('source','')}"
+        )
+    if use_graph:
+        print(f"\nRetrieval: used_k={used_k} attempts={attempts}")
+    if show_usage and usage:
+        print(
+            f"\nUsage: prompt={usage.prompt_tokens} completion={usage.completion_tokens} "
+            f"total={usage.total_tokens} cost=${usage.estimated_cost:.4f}"
         )
     return 0
 
@@ -267,6 +335,10 @@ def main() -> int:
     chat.add_argument("--chat-model")
     chat.add_argument("--k", type=int)
     chat.add_argument("--output-format", choices=["markdown", "json", "plain"], default="markdown")
+    chat.add_argument("--graph", action="store_true", help="Use LangGraph adaptive flow.")
+    chat.add_argument("--show-usage", action="store_true", help="Print token/cost usage.")
+    chat.add_argument("--trace", action="store_true", help="Print step-by-step graph logs.")
+    chat.add_argument("--trace-preview-width", type=int, default=120)
     chat.set_defaults(func=_cmd_chat)
 
     list_cmd = subparsers.add_parser("list", help="List documents in Chroma")

@@ -29,7 +29,8 @@ AIML.RAGOpsLab
 ## Architecture
 
 - **Ingest**: file loaders (txt/md/pdf) → chunking → embeddings (Ollama) → Chroma
-- **Chat**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
+- **Chat (basic)**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
+- **Chat (LangGraph)**: adaptive retrieval with retries + usage/cost tracking
 - **Inspect**: list stored chunks and metadata in table/CSV/TSV formats
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
 
@@ -37,7 +38,6 @@ AIML.RAGOpsLab
 
 ## Yet to come (Work in Progress)
 
-- **LangGraph orchestration** — adaptive retrieval and retries.
 - **More data formats + metadata** — CSV/JSON/SQL loaders and targeted filters.
 - **Advanced LangChain tooling** — evals, tracing, optional serving.
 
@@ -96,6 +96,23 @@ list:
 
 retrieval:
   k: 4
+  k_default: 4
+  k_max: 12
+  retry_on_no_answer: true
+
+cost:
+  enabled: true
+  show_usage: true
+  max_prompt_tokens: 6000
+  max_total_tokens: 8000
+  estimator: ollama
+  default_prompt_per_1k: 0.0
+  default_completion_per_1k: 0.0
+
+pricing:
+  llama3.1:8b:
+    prompt_per_1k: 0.0
+    completion_per_1k: 0.0
 ```
 
 Default config sections:
@@ -105,7 +122,9 @@ Default config sections:
 - `chunking`: `chunk_size`, `chunk_overlap`
 - `files`: `extensions`
 - `list`: `limit`, `format`, `preview_width`
-- `retrieval`: `k`
+- `retrieval`: `k`, `k_default`, `k_max`, `retry_on_no_answer`
+- `cost`: `enabled`, `show_usage`, token limits, estimator, default prices
+- `pricing`: per‑model `prompt_per_1k` and `completion_per_1k`
 
 ## CLI commands
 
@@ -214,9 +233,15 @@ Options:
 - `--chat-model`: Ollama chat model (default from config)
 - `--k`: number of chunks retrieved (default from config)
 - `--output-format`: `markdown|json|plain` (default: `markdown`)
+- `--graph`: use LangGraph adaptive flow (retry with higher `k`)
+- `--show-usage`: print token usage + estimated cost
+- `--trace`: print step-by-step graph logs (retrieval/answer/retry)
+- `--trace-preview-width`: preview width for trace chunk snippets
 
 Output:
 - Answer + citations (file, page, source)
+- Optional usage + cost summary when enabled
+- Answer is printed in a fenced block for readability (markdown output).
 
 Examples:
 ```bash
@@ -225,6 +250,18 @@ python -m ragopslab chat --query "Summarize the resume in 3 bullet points."
 
 # JSON output for scripting
 python -m ragopslab chat --query "Summarize the resume in 3 bullet points." --output-format json
+
+# LangGraph adaptive retrieval with usage/cost output
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --show-usage
+
+# Graph trace logs (step-by-step)
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --trace
 ```
 
 ## Chroma data behavior

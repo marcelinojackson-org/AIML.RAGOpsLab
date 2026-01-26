@@ -3,6 +3,7 @@ langchain-chroma
 langchain-community
 langchain-ollama
 langchain-text-splitters
+langgraph
 chromadb
 pypdf
 pyyaml

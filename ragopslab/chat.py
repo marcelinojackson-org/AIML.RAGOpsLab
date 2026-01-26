@@ -13,6 +13,8 @@ from langchain_ollama import ChatOllama, OllamaEmbeddings
 class ChatResult:
     answer: str
     citations: list[dict[str, Any]]
+    response_metadata: dict[str, Any] | None = None
+    context: str | None = None
 
 
 def answer_question(
@@ -62,6 +64,13 @@ def answer_question(
     )
     llm = ChatOllama(model=chat_model)
     chain = prompt | llm
-    response = chain.invoke({"context": "\n\n".join(context_lines), "question": query})
+    context = "\n\n".join(context_lines)
+    response = chain.invoke({"context": context, "question": query})
+    metadata = getattr(response, "response_metadata", {}) or {}
 
-    return ChatResult(answer=response.content, citations=citations)
+    return ChatResult(
+        answer=response.content,
+        citations=citations,
+        response_metadata=metadata,
+        context=context,
+    )

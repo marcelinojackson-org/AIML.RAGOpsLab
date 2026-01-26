@@ -33,6 +33,24 @@ DEFAULTS: dict[str, Any] = {
     },
     "retrieval": {
         "k": 4,
+        "k_default": 4,
+        "k_max": 12,
+        "retry_on_no_answer": True,
+    },
+    "cost": {
+        "enabled": True,
+        "show_usage": True,
+        "max_prompt_tokens": 6000,
+        "max_total_tokens": 8000,
+        "estimator": "ollama",
+        "default_prompt_per_1k": 0.00,
+        "default_completion_per_1k": 0.00,
+    },
+    "pricing": {
+        "llama3.1:8b": {
+            "prompt_per_1k": 0.00,
+            "completion_per_1k": 0.00,
+        }
     },
 }
 

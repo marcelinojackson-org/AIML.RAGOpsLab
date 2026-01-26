@@ -13,6 +13,7 @@ flowchart LR
   subgraph Pipeline
     LOAD[Loaders<br/>txt/md/pdf]
     CHK[Chunking<br/>size/overlap]
+    LG["LangGraph (optional)"]
     RET[Retriever<br/>top-k]
   end
 
@@ -33,7 +34,10 @@ flowchart LR
   ING --> LOAD --> CHK --> EMB --> VEC
 
   UQ --> CHT
-  CHT --> RET --> VEC
+  CHT --> LG
+  CHT -.-> RET
+  LG --> RET
+  RET --> VEC
   RET --> LLM
   LLM --> CHT
 
@@ -45,6 +49,7 @@ flowchart LR
   CFG -.-> LST
   CFG -.-> LOAD
   CFG -.-> CHK
+  CFG -.-> LG
   CFG -.-> RET
   CFG -.-> EMB
   CFG -.-> LLM

@@ -200,13 +200,42 @@ python -m ragopslab chat \
 - Day 5 (more formats + metadata): structured data + file filters to target specific sources (e.g., resume only).
 - Day 6 (advanced tooling): reranking/compression to improve quality without huge `k`.
 
-## Day 4 - LangGraph orchestration
+## Day 4 - LangGraph orchestration (done)
 
 **Goal**
 - Model the pipeline (ingest → retrieve → answer) as a LangGraph.
 
-**Planned demo**
-- Run the graph version and confirm identical output.
+**What was built**
+- LangGraph flow: retrieve → answer → assess → retry (adaptive `k`).
+- Cost/token tracking with Ollama metadata + heuristic fallback.
+- Config support for `retrieval.k_default/k_max/retry_on_no_answer`.
+- Config support for `cost` + per‑model `pricing`.
+- CLI flags `--graph` and `--show-usage`.
+- CLI flag `--trace` for step-by-step graph logs with chunk previews.
+
+**End-of-day demo**
+```bash
+cd /Users/marc/dev/opensource/AIML/AIML.RAGOpsLab
+uv venv
+source .venv/bin/activate
+uv pip install -r requirements.txt
+
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --show-usage
+
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --trace
+```
+
+**Standup notes (readable status)**
+- I added a LangGraph-driven adaptive RAG flow that retries with higher `k` when answers are missing.
+- Token usage and estimated cost are now tracked (from Ollama metadata or a heuristic fallback).
+- Config now supports retrieval bounds and per‑model pricing, with CLI flags to enable graph mode and usage output.
+- Chat output now prints the answer in a fenced block for readability.
 
 ## Day 5 - More data formats + config
 

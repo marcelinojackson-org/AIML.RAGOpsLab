@@ -23,3 +23,20 @@ list:
 
 retrieval:
   k: 4
+  k_default: 4
+  k_max: 12
+  retry_on_no_answer: true
+
+cost:
+  enabled: true
+  show_usage: true
+  max_prompt_tokens: 6000
+  max_total_tokens: 8000
+  estimator: ollama
+  default_prompt_per_1k: 0.0
+  default_completion_per_1k: 0.0
+
+pricing:
+  llama3.1:8b:
+    prompt_per_1k: 0.0
+    completion_per_1k: 0.0
