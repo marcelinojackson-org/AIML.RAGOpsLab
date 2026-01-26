@@ -1,10 +1,10 @@
 # AIML.RAGOpsLab (LangChain) — Work in Progress
 
-A clean, incremental build of a local RAG system using LangChain + Ollama + Chroma.
+A local RAG system using LangChain + Ollama + Chroma.
 
 ## What this repo is
 
-- A LangChain-first RAG lab that grows in small, demoable increments.
+- A LangChain-first RAG lab built for local ingestion, retrieval, and chat.
 - A local-first stack that uses Ollama for models and Chroma for storage.
 - A CLI-driven workflow for ingesting data and chatting with it.
 
