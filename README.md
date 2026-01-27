@@ -33,6 +33,7 @@ AIML.RAGOpsLab
 - **Chat (LangGraph)**: adaptive retrieval with retries + usage/cost tracking
 - **Inspect**: list stored chunks/metadata and source inventories (table/CSV/TSV)
 - **Evaluate**: run a lightweight Q/A eval set and review pass/fail results
+- **Test**: run a pytest harness covering unit, CLI, and integration paths
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
 
 ### Flowchart
@@ -45,7 +46,7 @@ AIML.RAGOpsLab
 
 ## Yet to come (Work in Progress)
 
-- **Advanced LangChain tooling** — evals, tracing, optional serving.
+- **Advanced LangChain tooling** — optional serving and extended observability.
 
 ## Setup
 
@@ -350,6 +351,28 @@ Example:
 python -m ragopslab eval \
   --eval-file data/eval/sample_eval.json \
   --output temp/eval_results.json
+```
+
+### Tests
+
+Run the full test harness (unit + CLI + integration).
+
+```bash
+pytest
+```
+
+Notes:
+- Tests default to real Ollama runs (integration tests hit the local Ollama server).
+- For a fast/mock run without Ollama, set `OLLAMA_TESTS=0` to skip integration tests.
+- Pytest is configured to run verbose output by default (per‑test PASS/FAIL lines).
+
+Examples:
+```bash
+# Full run (includes Ollama integration tests)
+pytest -q
+
+# Mocked run (skip Ollama integration tests)
+OLLAMA_TESTS=0 pytest -q
 ```
 
 ## Chroma data behavior

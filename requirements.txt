@@ -4,6 +4,7 @@ langchain-community
 langchain-ollama
 langchain-text-splitters
 langgraph
+pytest
 chromadb
 pypdf
 pyyaml

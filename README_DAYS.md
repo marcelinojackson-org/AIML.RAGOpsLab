@@ -199,6 +199,7 @@ python -m ragopslab chat \
 - Day 4 (LangGraph): automatic fallback — re‑run retrieval with higher `k` or refined queries if the answer is missing.
 - Day 5 (more formats + metadata): structured data + file filters to target specific sources (e.g., resume only).
 - Day 6 (retrieval + evals): filters, optional MMR reranking, trace export, and eval harness.
+- Day 7 (testing): pytest harness, unit + integration + CLI tests, Ollama‑backed integration tests.
 
 ## Day 4 - LangGraph orchestration (done)
 
@@ -264,7 +265,7 @@ python -m ragopslab sources --format csv --output temp/sources.csv
 - Added a `sources` command to list indexed files and counts (table/CSV/TSV).
 - Sample CSV/JSON files are included for demo ingestion.
 
-## Day 6 - Retrieval controls + evals (in progress)
+## Day 6 - Retrieval controls + evals (done)
 
 **Goal**
 - Add filters and optional reranking for retrieval quality.
@@ -303,3 +304,38 @@ python -m ragopslab eval \
 - Added optional MMR reranking to improve relevance without inflating `k`.
 - Trace logs can now be exported to JSON for debugging and demos.
 - Added a lightweight `eval` command for repeatable QA checks.
+
+## Day 7 - Test harness (done)
+
+**Goal**
+- Add a reliable test harness that exercises unit, CLI, and integration paths.
+
+**What was built**
+- `pytest` is now included in `requirements.txt` and configured via `pytest.ini`.
+- Unit tests for config/loaders/inspect logic.
+- CLI tests for `list` and `sources`.
+- Integration test that ingests + chats using Ollama (guarded by `OLLAMA_TESTS`).
+- Default pytest output shows per‑test status (`PASSED`) in verbose mode.
+
+**End-of-day demo**
+```bash
+pytest
+```
+
+**Sample output (Ollama enabled)**
+```
+tests/test_chat_integration.py::test_ingest_and_chat_integration PASSED
+tests/test_cli_list_sources.py::test_cli_list_and_sources PASSED
+tests/test_config.py::test_load_config_defaults PASSED
+tests/test_eval.py::test_run_eval_with_mock PASSED
+tests/test_inspect.py::test_list_sources_filters PASSED
+tests/test_inspect.py::test_summarize_collection_page_filter PASSED
+tests/test_loaders.py::test_load_csv_and_json PASSED
+
+============================== 7 passed in 4.94s ===============================
+```
+
+**Standup notes (readable status)**
+- Added a pytest harness with unit, CLI, and Ollama‑backed integration tests.
+- Tests default to real Ollama runs; set `OLLAMA_TESTS=0` to mock.
+- Pytest now prints each test with pass/fail status for visibility.
