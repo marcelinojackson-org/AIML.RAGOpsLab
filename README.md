@@ -1,10 +1,11 @@
-# AIML.RAGOpsLab (LangChain) — Work in Progress
+# AIML.RAGOpsLab (LangGraph)
 
 A local RAG system using LangChain + Ollama + Chroma.
 
 ## What this repo is
 
-- A LangChain-first RAG lab built for local ingestion, retrieval, and chat.
+- A LangGraph-first RAG lab built for local ingestion, retrieval, and chat.
+- A pytest test harness covering unit, CLI, and Ollama-backed integration paths.
 - A local-first stack that uses Ollama for models and Chroma for storage.
 - A CLI-driven workflow for ingesting data and chatting with it.
 
@@ -44,7 +45,7 @@ AIML.RAGOpsLab
 
 ![Cross Functional Flowchart](docs/architecture_cross.svg)
 
-## Yet to come (Work in Progress)
+## Yet to come
 
 - **Advanced LangChain tooling** — optional serving and extended observability.
 
