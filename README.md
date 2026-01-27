@@ -32,6 +32,7 @@ AIML.RAGOpsLab
 - **Chat (basic)**: retrieve top‑k chunks from Chroma → answer with Ollama + citations
 - **Chat (LangGraph)**: adaptive retrieval with retries + usage/cost tracking
 - **Inspect**: list stored chunks/metadata and source inventories (table/CSV/TSV)
+- **Evaluate**: run a lightweight Q/A eval set and review pass/fail results
 - **Config**: `config.yaml` provides defaults; CLI flags override per run
 
 ### Flowchart
@@ -104,6 +105,9 @@ retrieval:
   k_default: 4
   k_max: 12
   retry_on_no_answer: true
+  search_type: similarity
+  mmr_fetch_k: 20
+  filters: {}
 
 cost:
   enabled: true
@@ -127,7 +131,7 @@ Default config sections:
 - `chunking`: `chunk_size`, `chunk_overlap`
 - `files`: `extensions`
 - `list`: `limit`, `format`, `preview_width`
-- `retrieval`: `k`, `k_default`, `k_max`, `retry_on_no_answer`
+- `retrieval`: `k`, `k_default`, `k_max`, `retry_on_no_answer`, `search_type`, `mmr_fetch_k`, `filters`
 - `cost`: `enabled`, `show_usage`, token limits, estimator, default prices
 - `pricing`: per‑model `prompt_per_1k` and `completion_per_1k`
 
@@ -272,6 +276,12 @@ Options:
 - `--show-usage`: print token usage + estimated cost
 - `--trace`: print step-by-step graph logs (retrieval/answer/retry)
 - `--trace-preview-width`: preview width for trace chunk snippets
+- `--trace-output`: write LangGraph trace output to a JSON file
+- `--search-type`: `similarity|mmr` (default from config)
+- `--mmr-fetch-k`: fetch size used by MMR reranking
+- `--source-type`: filter retrieval by `source_type` (csv/json/pdf/txt/md)
+- `--file-name`: filter retrieval by file name
+- `--page`: filter retrieval to a specific page number
 
 Output:
 - Answer + citations (file, page, source)
@@ -297,6 +307,49 @@ python -m ragopslab chat \
   --query "How many years of Python experience are mentioned?" \
   --graph \
   --trace
+
+# Trace export to JSON
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --trace-output temp/trace.json
+
+# MMR reranking + filters
+python -m ragopslab chat \
+  --query "Summarize the CSV entries." \
+  --search-type mmr \
+  --mmr-fetch-k 20 \
+  --source-type csv
+```
+
+### `eval`
+
+Run a lightweight eval set (JSON array of questions + expected substrings).
+
+```bash
+python -m ragopslab eval --eval-file data/eval/sample_eval.json
+```
+
+Options:
+- `--config`: path to config file (default: `config.yaml`)
+- `--eval-file`: JSON file with eval questions (required)
+- `--persist-dir`: Chroma storage directory (default from config)
+- `--collection`: Chroma collection name (default from config)
+- `--embedding-model`: embedding model for retrieval (default from config)
+- `--chat-model`: Ollama chat model (default from config)
+- `--k`: number of chunks retrieved (default from config)
+- `--output`: write eval results to a JSON file
+- `--search-type`: `similarity|mmr` (default from config)
+- `--mmr-fetch-k`: fetch size used by MMR reranking
+- `--source-type`: filter retrieval by `source_type` (csv/json/pdf/txt/md)
+- `--file-name`: filter retrieval by file name
+- `--page`: filter retrieval to a specific page number
+
+Example:
+```bash
+python -m ragopslab eval \
+  --eval-file data/eval/sample_eval.json \
+  --output temp/eval_results.json
 ```
 
 ## Chroma data behavior
@@ -315,3 +368,11 @@ python -m ragopslab chat \
 - Use `--format csv|tsv` for scrollable output, and `--output <file>` to save to disk.
 - Use `--page <n>` to filter by PDF page, `--chunk-text` for full chunk text, and `--include-vectors` (optionally `--vector-dims N`) to export embeddings.
 - Use `python -m ragopslab sources` to see which files were indexed and how many chunks/records each produced.
+
+## Retrieval limits & tips
+
+- The model only sees the **top‑k retrieved chunks**, not the entire corpus.
+- Higher `k` increases recall but also adds noise and cost; start small and increase when answers are incomplete.
+- If an answer isn’t present in the retrieved chunks, the correct response is **“I don’t know.”**
+- Use filters (`--source-type`, `--file-name`, `--page`) to scope retrieval when you know the target file or page.
+- With `--graph`, the system can retry with a higher `k` automatically when answers are missing.

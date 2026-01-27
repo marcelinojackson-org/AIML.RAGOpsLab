@@ -1,0 +1,10 @@
+[
+  {
+    "question": "What is the candidate's name?",
+    "expected": ["Marcelino", "Jackson"]
+  },
+  {
+    "question": "What is the file type of the resume?",
+    "expected": "pdf"
+  }
+]

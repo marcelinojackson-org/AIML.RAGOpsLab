@@ -198,7 +198,7 @@ python -m ragopslab chat \
 **What’s coming to improve this**
 - Day 4 (LangGraph): automatic fallback — re‑run retrieval with higher `k` or refined queries if the answer is missing.
 - Day 5 (more formats + metadata): structured data + file filters to target specific sources (e.g., resume only).
-- Day 6 (advanced tooling): reranking/compression to improve quality without huge `k`.
+- Day 6 (retrieval + evals): filters, optional MMR reranking, trace export, and eval harness.
 
 ## Day 4 - LangGraph orchestration (done)
 
@@ -264,10 +264,42 @@ python -m ragopslab sources --format csv --output temp/sources.csv
 - Added a `sources` command to list indexed files and counts (table/CSV/TSV).
 - Sample CSV/JSON files are included for demo ingestion.
 
-## Day 6 - Advanced LangChain tooling
+## Day 6 - Retrieval controls + evals (in progress)
 
 **Goal**
-- Optional LangSmith tracing + evals and optional LangServe API.
+- Add filters and optional reranking for retrieval quality.
+- Export trace logs to file for observability.
+- Add a lightweight eval harness for QA checks.
 
-**Planned demo**
-- Show tracing or an eval report (if enabled).
+**What was built**
+- Retrieval filters for `source_type`, `file_name`, and `page`.
+- Optional MMR reranking via `search_type=mmr` + `mmr_fetch_k`.
+- LangGraph trace export to JSON via `--trace-output`.
+- New `eval` command to run a JSON eval set and score pass/fail.
+- Config defaults for `retrieval.search_type`, `retrieval.mmr_fetch_k`, and `retrieval.filters`.
+
+**End-of-day demo**
+```bash
+python -m ragopslab chat \
+  --query "How many years of Python experience are mentioned?" \
+  --graph \
+  --trace \
+  --trace-output temp/trace.json \
+  --source-type pdf
+
+python -m ragopslab chat \
+  --query "Summarize the CSV entries." \
+  --search-type mmr \
+  --mmr-fetch-k 20 \
+  --source-type csv
+
+python -m ragopslab eval \
+  --eval-file data/eval/sample_eval.json \
+  --output temp/eval_results.json
+```
+
+**Standup notes (readable status)**
+- Added retrieval filters so we can scope by source type, file name, or page.
+- Added optional MMR reranking to improve relevance without inflating `k`.
+- Trace logs can now be exported to JSON for debugging and demos.
+- Added a lightweight `eval` command for repeatable QA checks.

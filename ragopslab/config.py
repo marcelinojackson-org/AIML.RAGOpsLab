@@ -36,6 +36,9 @@ DEFAULTS: dict[str, Any] = {
         "k_default": 4,
         "k_max": 12,
         "retry_on_no_answer": True,
+        "search_type": "similarity",
+        "mmr_fetch_k": 20,
+        "filters": {},
     },
     "cost": {
         "enabled": True,

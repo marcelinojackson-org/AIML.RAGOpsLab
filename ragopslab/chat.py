@@ -24,6 +24,9 @@ def answer_question(
     embedding_model: str,
     chat_model: str,
     k: int,
+    filters: dict[str, Any] | None = None,
+    search_type: str = "similarity",
+    mmr_fetch_k: int | None = None,
 ) -> ChatResult:
     embeddings = OllamaEmbeddings(model=embedding_model)
     vectorstore = Chroma(
@@ -31,7 +34,15 @@ def answer_question(
         persist_directory=str(persist_dir),
         embedding_function=embeddings,
     )
-    retriever = vectorstore.as_retriever(search_kwargs={"k": k})
+    search_kwargs: dict[str, Any] = {"k": k}
+    if filters:
+        search_kwargs["filter"] = filters
+    if search_type == "mmr":
+        if mmr_fetch_k:
+            search_kwargs["fetch_k"] = mmr_fetch_k
+        retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs=search_kwargs)
+    else:
+        retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
     docs = retriever.invoke(query)
 
     if not docs:

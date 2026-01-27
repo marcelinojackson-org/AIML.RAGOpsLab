@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypedDict
 import textwrap
+from datetime import datetime
+import json
 
 from langchain_chroma import Chroma
 from langchain_core.prompts import ChatPromptTemplate
@@ -31,6 +33,7 @@ class GraphChatResult:
     attempts: int
     response_metadata: dict[str, Any] | None = None
     context: str | None = None
+    trace_log: list[dict[str, Any]] | None = None
 
 
 def _build_context(docs: list) -> tuple[str, list[dict[str, Any]]]:
@@ -61,6 +64,10 @@ def answer_question_graph(
     retry_on_no_answer: bool,
     trace: bool = False,
     trace_preview_width: int = 120,
+    trace_output: Path | None = None,
+    filters: dict[str, Any] | None = None,
+    search_type: str = "similarity",
+    mmr_fetch_k: int | None = None,
 ) -> GraphChatResult:
     embeddings = OllamaEmbeddings(model=embedding_model)
     vectorstore = Chroma(
@@ -68,7 +75,15 @@ def answer_question_graph(
         persist_directory=str(persist_dir),
         embedding_function=embeddings,
     )
-    retriever = vectorstore.as_retriever(search_kwargs={"k": k_default})
+    search_kwargs: dict[str, Any] = {"k": k_default}
+    if filters:
+        search_kwargs["filter"] = filters
+    if search_type == "mmr":
+        if mmr_fetch_k:
+            search_kwargs["fetch_k"] = mmr_fetch_k
+        retriever = vectorstore.as_retriever(search_type="mmr", search_kwargs=search_kwargs)
+    else:
+        retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
 
     prompt = ChatPromptTemplate.from_messages(
         [
@@ -84,7 +99,19 @@ def answer_question_graph(
     llm = ChatOllama(model=chat_model)
     chain = prompt | llm
 
-    def _log(message: str) -> None:
+    trace_log: list[dict[str, Any]] = []
+
+    def _record(event: str, details: dict[str, Any] | None = None) -> None:
+        trace_log.append(
+            {
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "event": event,
+                "details": details or {},
+            }
+        )
+
+    def _log(message: str, details: dict[str, Any] | None = None) -> None:
+        _record(message, details)
         if trace:
             print(message)
 
@@ -97,7 +124,10 @@ def answer_question_graph(
             _log("[graph] retrieve: no documents returned")
             return {"docs": [], "context": "", "citations": []}
         context, citations = _build_context(docs)
-        _log(f"[graph] retrieve: docs={len(docs)} context_chars={len(context)}")
+        _log(
+            f"[graph] retrieve: docs={len(docs)} context_chars={len(context)}",
+            {"docs": len(docs), "context_chars": len(context)},
+        )
         for idx, doc in enumerate(docs, start=1):
             metadata = doc.metadata or {}
             source = metadata.get("source", "")
@@ -160,6 +190,16 @@ def answer_question_graph(
         }
     )
 
+    if trace_output:
+        trace_output.parent.mkdir(parents=True, exist_ok=True)
+        trace_payload = {
+            "query": query,
+            "used_k": final_state.get("k", k_default),
+            "attempts": final_state.get("attempts", 0),
+            "trace": trace_log,
+        }
+        trace_output.write_text(json.dumps(trace_payload, ensure_ascii=True, indent=2))
+
     return GraphChatResult(
         answer=final_state.get("answer", ""),
         citations=final_state.get("citations", []) or [],
@@ -167,4 +207,5 @@ def answer_question_graph(
         attempts=final_state.get("attempts", 0),
         response_metadata=final_state.get("response_metadata"),
         context=final_state.get("context", ""),
+        trace_log=trace_log if trace_log else None,
     )

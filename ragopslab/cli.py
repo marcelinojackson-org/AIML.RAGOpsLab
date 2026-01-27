@@ -10,6 +10,7 @@ from ragopslab.config import load_config
 from ragopslab.graph_chat import answer_question_graph
 from ragopslab.ingest import ingest_directory
 from ragopslab.inspect import list_sources, summarize_collection
+from ragopslab.eval import run_eval
 from ragopslab.usage import build_usage_summary
 
 
@@ -58,6 +59,18 @@ def _cmd_chat(args: argparse.Namespace) -> int:
     k_default = config["retrieval"].get("k_default", k)
     k_max = config["retrieval"].get("k_max", k)
     retry_on_no_answer = config["retrieval"].get("retry_on_no_answer", True)
+    search_type = args.search_type or config["retrieval"].get("search_type", "similarity")
+    mmr_fetch_k = args.mmr_fetch_k or config["retrieval"].get("mmr_fetch_k", None)
+
+    filters = dict(config["retrieval"].get("filters", {}) or {})
+    if args.source_type:
+        filters["source_type"] = args.source_type
+    if args.file_name:
+        filters["file_name"] = args.file_name
+    if args.page is not None:
+        filters["page"] = args.page
+    if not filters:
+        filters = None
 
     use_graph = bool(args.graph)
     if use_graph:
@@ -72,6 +85,10 @@ def _cmd_chat(args: argparse.Namespace) -> int:
             retry_on_no_answer=retry_on_no_answer,
             trace=bool(args.trace),
             trace_preview_width=args.trace_preview_width,
+            trace_output=Path(args.trace_output) if args.trace_output else None,
+            filters=filters,
+            search_type=search_type,
+            mmr_fetch_k=mmr_fetch_k,
         )
         response_metadata = result.response_metadata
         context = result.context or ""
@@ -85,6 +102,9 @@ def _cmd_chat(args: argparse.Namespace) -> int:
             embedding_model=embedding_model,
             chat_model=chat_model,
             k=k,
+            filters=filters,
+            search_type=search_type,
+            mmr_fetch_k=mmr_fetch_k,
         )
         response_metadata = result.response_metadata
         context = result.context or ""
@@ -143,6 +163,8 @@ def _cmd_chat(args: argparse.Namespace) -> int:
         }
         if use_graph:
             payload["retrieval"] = {"used_k": used_k, "attempts": attempts}
+            if args.trace_output:
+                payload["trace_output"] = args.trace_output
         if show_usage and usage:
             payload["usage"] = {
                 "prompt_tokens": usage.prompt_tokens,
@@ -166,6 +188,8 @@ def _cmd_chat(args: argparse.Namespace) -> int:
         )
     if use_graph:
         print(f"\nRetrieval: used_k={used_k} attempts={attempts}")
+        if args.trace_output:
+            print(f"Trace output: {args.trace_output}")
     if show_usage and usage:
         print(
             f"\nUsage: prompt={usage.prompt_tokens} completion={usage.completion_tokens} "
@@ -342,6 +366,44 @@ def _cmd_sources(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_eval(args: argparse.Namespace) -> int:
+    config = load_config(Path(args.config) if args.config else None)
+    filters = dict(config["retrieval"].get("filters", {}) or {})
+    if args.source_type:
+        filters["source_type"] = args.source_type
+    if args.file_name:
+        filters["file_name"] = args.file_name
+    if args.page is not None:
+        filters["page"] = args.page
+    if not filters:
+        filters = None
+
+    search_type = args.search_type or config["retrieval"].get("search_type", "similarity")
+    mmr_fetch_k = args.mmr_fetch_k or config["retrieval"].get("mmr_fetch_k", None)
+    k = args.k if args.k is not None else config["retrieval"]["k"]
+
+    result = run_eval(
+        eval_file=Path(args.eval_file),
+        persist_dir=Path(args.persist_dir or config["paths"]["persist_dir"]),
+        collection_name=args.collection or config["chroma"]["collection"],
+        embedding_model=args.embedding_model or config["models"]["embedding_model"],
+        chat_model=args.chat_model or config["models"]["chat_model"],
+        k=k,
+        filters=filters,
+        search_type=search_type,
+        mmr_fetch_k=mmr_fetch_k,
+    )
+
+    if args.output:
+        Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+        Path(args.output).write_text(json.dumps(result, ensure_ascii=True, indent=2))
+        print(f"Wrote eval results to {args.output}")
+        return 0
+
+    print(json.dumps(result, ensure_ascii=True, indent=2))
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="RAG Ops Lab (LangChain)")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -375,6 +437,12 @@ def main() -> int:
     chat.add_argument("--show-usage", action="store_true", help="Print token/cost usage.")
     chat.add_argument("--trace", action="store_true", help="Print step-by-step graph logs.")
     chat.add_argument("--trace-preview-width", type=int, default=120)
+    chat.add_argument("--trace-output", help="Write LangGraph trace output to a JSON file.")
+    chat.add_argument("--search-type", choices=["similarity", "mmr"])
+    chat.add_argument("--mmr-fetch-k", type=int, help="Fetch size for MMR reranking.")
+    chat.add_argument("--source-type", help="Filter retrieval by source_type (csv/json/pdf/txt/md).")
+    chat.add_argument("--file-name", help="Filter retrieval by file name.")
+    chat.add_argument("--page", type=int, help="Filter retrieval to a specific page number.")
     chat.set_defaults(func=_cmd_chat)
 
     list_cmd = subparsers.add_parser("list", help="List documents in Chroma")
@@ -401,6 +469,22 @@ def main() -> int:
     sources_cmd.add_argument("--source-type", help="Filter by source_type (csv/json/pdf/txt/md).")
     sources_cmd.add_argument("--file-name", help="Filter by file name.")
     sources_cmd.set_defaults(func=_cmd_sources)
+
+    eval_cmd = subparsers.add_parser("eval", help="Run a lightweight QA eval set")
+    eval_cmd.add_argument("--config", default="config.yaml")
+    eval_cmd.add_argument("--eval-file", required=True, help="Path to eval JSON file.")
+    eval_cmd.add_argument("--persist-dir")
+    eval_cmd.add_argument("--collection")
+    eval_cmd.add_argument("--embedding-model")
+    eval_cmd.add_argument("--chat-model")
+    eval_cmd.add_argument("--k", type=int)
+    eval_cmd.add_argument("--output", help="Write eval results to a JSON file.")
+    eval_cmd.add_argument("--search-type", choices=["similarity", "mmr"])
+    eval_cmd.add_argument("--mmr-fetch-k", type=int)
+    eval_cmd.add_argument("--source-type", help="Filter retrieval by source_type (csv/json/pdf/txt/md).")
+    eval_cmd.add_argument("--file-name", help="Filter retrieval by file name.")
+    eval_cmd.add_argument("--page", type=int, help="Filter retrieval to a specific page number.")
+    eval_cmd.set_defaults(func=_cmd_eval)
 
     args = parser.parse_args()
     return int(args.func(args))
