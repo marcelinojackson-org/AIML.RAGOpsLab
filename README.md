@@ -400,3 +400,7 @@ OLLAMA_TESTS=0 pytest -q
 - If an answer isn’t present in the retrieved chunks, the correct response is **“I don’t know.”**
 - Use filters (`--source-type`, `--file-name`, `--page`) to scope retrieval when you know the target file or page.
 - With `--graph`, the system can retry with a higher `k` automatically when answers are missing.
+
+## License
+
+This project is licensed under the Apache License 2.0. See [LICENSE](LICENSE).
